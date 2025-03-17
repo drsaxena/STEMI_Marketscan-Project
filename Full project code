@@ -1,0 +1,947 @@
+/*AIM 
+1*/
+
+%macro c(yr, infile, indata);
+    data pt&yr;
+        set &infile..&indata;
+   if DX1 IN ("I21","I210", "I2101", "I2102", "I2109", "I211","I2111", "I2119","I212", "I2121", "I2129","I213","I220","I221","I228","I229") THEN MI=1;
+if MI = 1;
+    run;
+
+    proc sort data=pt&yr; 
+        by ENROLID;
+    run;
+%mend;
+%C(2016,INPAT,CCAEI16);
+%c(2017,inpat,ccaei17);
+%c(2018,inpat,ccaei18);
+%c(2019,inpat,ccaei19);
+%c(2020,inpat,ccaei20);
+%c(2021,inpat,ccaei21);
+
+
+
+/*also taking medicare people*/
+%macro c(yr, infile, indata);
+    data M&yr;
+        set &infile..&indata;
+      if DX1 IN ("I21","I210", "I2101", "I2102", "I2109", "I211","I2111", "I2119","I212", "I2121", "I2129","I213","I220","I221","I228","I229") THEN MI=1;
+if MI = 1;
+    run;
+
+    proc sort data=M&yr; 
+        by ENROLID;
+    run;
+%mend;
+%C(2016,INPAT,MDCRI16);
+%c(2017,inpat,mdcri17);
+%c(2018,inpat,mdcri18);
+%c(2019,inpat,mdcri19);
+%c(2020,inpat,mdcri20);
+%c(2021,inpat,mdcri21);
+
+
+DATA COMMERCIAL;
+SET PT2016-PT2021;
+RUN;
+
+DATA MEDI;
+SET M2016-M2021;
+RUN;
+
+DATA YOUNG.ALL (RENAME=(ADMDATE=STEMI_ADMSN DISDATE=STEMI_DSCHRG));
+SET COMMERCIAL MEDI;
+RUN; /*52981 ALL AGES*/
+
+
+PROC SORT DATA=young.ALL;
+BY ENROLID STEMI_DSCHRG;
+RUN;
+
+data young.allpatient ; /*1st occurance of pateints taken = 
+We dont have any diseases/outcome yet 
+so we will take all patients and index= 1st apprearance*/
+set young.all;
+if first.enrolid; by enrolid;
+run; /*51470 ALL PATIENTS - REMOVED DUPLICATED. ONLY 1ST OCCURANCE*/
+proc print data=young.allpatients (obs=10); run;
+
+
+data YOUNG.ALLPATIENTS;
+set YOUNG.allpatient;
+index_age=year(stemi_dschrg)-dobyr;
+if index_age<18 then delete; 
+run;
+data young.allpat;
+set young.allpatients;
+if enrolid=. then delete;
+run;
+data young.allpat;
+set young.allpat;
+if stemi_dschrg=. or stemi_admsn=. then delete;
+run;
+
+
+/*ENROLLMENT 6 MONTHS BACK 
+THIS PART OF PROJECT - AIM 1*/
+
+
+%macro e(year, folder, file);
+data en (keep= 
+Obs ENROLID YEAR DOBYR SEX HLTHPLAN EECLASS EESTATU EGEOLOC INDSTRY MHSACOVG MSA REGION ENROL&YEAR PLAN&YEAR DATATYPE&YEAR) ;
+set &folder..&file;
+enrol&year=compress(enrind1||enrind2||enrind3||enrind4||enrind5||enrind6||enrind7||enrind8||enrind9||enrind10||enrind11||enrind12||" ");
+plan&year=compress(plntyp1||plntyp2||plntyp3||plntyp4||plntyp5||plntyp6||plntyp7||plntyp8||plntyp9||plntyp10||plntyp11||plntyp12||" ");
+DATATYPE&YEAR = COMPRESS(DATTYP1||DATTYP2||DATTYP3||DATTYP4||DATTYP5||DATTYP6||DATTYP7||DATTYP8||DATTYP9||DATTYP10||DATTYP11||DATTYP12||" ");
+run;
+
+data cca&year;
+set en;
+run;
+%mend; 
+%E(2015,enrol,ccaea15);
+%e(2016,enrol, ccaea16);
+%e(2017,enrol,ccaea17);
+%e(2018,enrol,ccaea18);
+%e(2019,enrol,ccaea19);
+%e(2020,enrol,ccaea20);
+%e(2021,enrol,ccaea21);
+%e(2022,enrol,ccaea22);
+
+%macro e(year, folder, file);
+data en (keep= 
+Obs ENROLID YEAR DOBYR SEX HLTHPLAN EECLASS EESTATU EGEOLOC INDSTRY MHSACOVG MSA REGION ENROL&YEAR PLAN&YEAR DATATYPE&YEAR) ;
+set &folder..&file;
+enrol&year=compress(enrind1||enrind2||enrind3||enrind4||enrind5||enrind6||enrind7||enrind8||enrind9||enrind10||enrind11||enrind12||" ");
+plan&year=compress(plntyp1||plntyp2||plntyp3||plntyp4||plntyp5||plntyp6||plntyp7||plntyp8||plntyp9||plntyp10||plntyp11||plntyp12||" ");
+DATATYPE&YEAR = COMPRESS(DATTYP1||DATTYP2||DATTYP3||DATTYP4||DATTYP5||DATTYP6||DATTYP7||DATTYP8||DATTYP9||DATTYP10||DATTYP11||DATTYP12||" ");
+run;
+
+data mdc&year;
+set en;
+run;
+%mend; 
+%e(2015,enrol,mdcra15);
+%e(2016,enrol, mdcra16);
+%e(2017,enrol,mdcra17);
+%e(2018,enrol,mdcra18);
+%e(2019,enrol,mdcra19);
+%e(2020,enrol,mdcra20);
+%e(2021,enrol,mdcra21);
+%e(2022,enrol,mdcra22);
+
+data medenrol;
+merge mdc2015-mdc2022;
+by enrolid; run;
+
+data enrollment;
+merge cca2015-cca2022;
+by enrolid;
+run;
+
+data allenrol;
+merge enrollment medenrol;
+by enrolid;
+run;
+
+proc sort data=allenrol;
+by enrolid;
+run;
+
+data cohort1;
+merge allenrol (in=a) young.allpat (in=b); /*merge with out patients file*/
+by enrolid;
+if a and b;
+run;
+data cohort1; set cohort1;
+index_year=year(stemi_dschrg);run;
+data cohort0;
+set cohort1;
+if index_year=2022 then delete;
+run;
+
+proc freq data=cohort0 ; tables index_year; run;
+
+data cohort2; set cohort0;
+array m2 {8} enrol2015-enrol2022;
+DO I=1 to 8;
+if m2{i}= ""  then m2{i}= "ZZZZZZZZZZZZ";
+END; RUN;
+data cohort3; set cohort2;
+array m1 {8} plan2015-plan2022;
+do i=1 to 8;
+if m1{i}= ""  then m1{i}="xxxxxxxxxxxx";
+end;run;
+data cohort4;
+set cohort3;
+array m3 {8} DATATYPE2015-DATATYPE2022;
+do i=1 to 8;
+if m3{i}=""  then m3{i}="yyyyyyyyyyyy";
+end;run;
+
+data COMPRESS;
+set cohort4;
+enrol=compress(enrol2015||enrol2016||enrol2017||enrol2018||enrol2019||enrol2020||enrol2021||enrol2022);
+plan=compress(plan2015||plan2016||plan2017||plan2018||plan2019||plan2020||plan2021||plan2022);
+type=compress(datatype2015||DATATYPE2016||DATATYPE2017||DATATYPE2018||DATATYPE2019||DATATYPE2020||DATATYPE2021||DATATYPE2022);
+run;
+
+data compress (keep=ENROLID DOBYR SEX HLTHPLAN EECLASS EESTATU EGEOLOC INDSTRY MHSACOVG MSA REGION 
+SEQNUM VERSION EFAMID ADMDATE AGE CASEID DAYS index_dt DRG DXVER HOSPNET HOSPPAY PDX PHYSID PHYSNET PHYSPAY PLANTYP 
+PPROC TOTCOB TOTCOINS TOTCOPAY TOTDED TOTNET TOTPAY ADMTYP MDC DSTATUS DATATYP DX1 DX2 DX3 DX4 DX5 DX6 DX7 DX8 DX9 
+DX10 DX11 DX12 DX13 DX14 DX15 PROC1 PROC2 PROC3 PROC4 PROC5 PROC6 PROC7 PROC8 PROC9 PROC10 PROC11 PROC12 PROC13 PROC14 
+PROC15 AGEGRP EIDFLAG EMPREL ENRFLAG PHYFLAG RX STATE POAPDX POADX1 POADX2 POADX3 POADX4 POADX5 POADX6 POADX7 POADX8 
+POADX9 POADX10 POADX11 POADX12 POADX13 POADX14 POADX15 index_year age_at_index MEDADV I enrol plan type index_dt);
+set compress;
+run;
+
+/*WE just want people who are insured irrespective of PPO/HMO*/
+
+
+/*LETS DO ONLY 6 MONTHS BEFORE INSURDED SAMPLE*/
+data insured_sample;
+    set compress;
+    complete = 0;
+    length enrol $400.;
+    
+    /* Calculate the start and end positions for the 6 months before the discharge date */
+    start = (year(stemi_dschrg) - 2015) * 12 + month(stemi_dschrg) - 6;
+    end = (year(stemi_dschrg) - 2015) * 12 + month(stemi_dschrg);
+
+    /* Loop to check if the enrolment is complete for the 6 months before the discharge date */
+    do i = start to end until (substr(enrol, i, 1) not in ("1"));
+        if substr(enrol, i, 1) in ("1") then complete + 1;
+    end;
+
+    /* Check if the enrolment is complete for the entire period */
+    if complete = end - start + 1 then insur = 1;
+    else insur = 0;
+
+    /* Keep only insured samples */
+    if insur = 1;
+run;
+
+
+/*43373 PATIENTS
+
+18+
+DX1 STEMI
+6MONTHS CONTINOUS ENROLLMENT 
+NO MISSING DATA*/
+
+/* TABLE 1- TOTAL STEMI CASES STRATIFIED BY AGE AND SEX*/
+
+data young.FINALSET;
+    set insured_sample;
+    if index_age <= 30 then age_cat = 1;
+    else if 30 < index_age <= 40 then age_cat = 2;
+    else if 40 < index_age <= 50 then age_cat = 3;
+    else if 50 < index_age <= 60 then age_cat = 4;
+    else if 60 < index_age <= 70 then age_cat = 5;
+    else if 70 < index_age <= 80 then age_cat = 6;
+    else if index_age > 80 then age_cat = 7;
+run;
+
+
+DATA PT_ID (KEEP=ENROLid stemi_admsn stemi_dschrg);
+set young.finalset;
+run;
+PROC SORT DATA=PT_ID; BY ENROLID;RUN;
+
+proc print data=young.finalset (obs=20); run;
+
+
+data young.FINALSET;
+    set young.finalset;
+    if index_age <= 50 then agecat = 1;
+    else if 50 < index_age <= 60 then agecat = 2;
+    else if 60 < index_age <= 70 then agecat = 3;
+    else if 70 < index_age <= 80 then agecat = 4;
+    else if index_age > 80 then agecat = 5;
+run;
+proc freq data=young.finalset;
+tables final_age;run;
+
+DATA YOUNG.FINALSET;
+SET young.finalset;
+    if index_age <= 50 then final_age = 1;
+    else if 50 < index_age <= 60 then final_age = 2;
+    else if 60 < index_age <= 70 then final_age = 3;
+    else if 70 < index_age <= 80 then final_age = 4;
+    else if index_age > 80 then final_age = 5;
+run;
+
+
+
+/************************************************************************************************************************************/
+
+
+
+/*COMORBS*/
+/*FOR COMORBS- WE TAKE= INPAT ADMISSION, INPAT SERVICE, OUTPATIENT FILES*/
+
+/*INPAT ADMISSION
+CCAE+MEDI*/
+%macro c(yr, infile, indata);
+    data pt&yr;
+        set &infile..&indata;
+run; 
+
+    proc sort data=pt&yr; 
+        by ENROLID;
+    run;
+data all_inpat&yr; merge pt_id (in=a) pt&yr (in=b); by enrolid; if a and b; run;
+
+%mend;
+%c(2015,inpat,ccaei15);
+%c(2016,inpat,ccaei16);
+%c(2017,inpat,ccaei17);
+%c(2018,inpat,ccaei18);
+%c(2019,inpat,ccaei19);
+%c(2020,inpat,ccaei20);
+%c(2021,inpat,ccaei21);
+
+
+%macro c(yr, infile, indata);
+    data pt&yr;
+        set &infile..&indata;
+     run;
+	 proc sort data=pt&yr;
+	 by enrolid;
+	 run;
+	 data all_inpat_medi&yr; merge pt_id (in=a) pt&yr (in=b); by enrolid; if a and b; run;
+	 %mend;
+%c(2015,inpat,mdcri15);
+%c(2016,inpat,mdcri16);
+%c(2017,inpat,mdcri17);
+%c(2018,inpat,mdcri18);
+%c(2019,inpat,mdcri19);
+%c(2020,inpat,mdcri20);
+%c(2021,inpat,mdcri21);
+
+
+/*INPAT SERVICE
+CCAE+MEDI*/
+%macro c(yr, infile, indata);
+    data pt&yr;
+        set &infile..&indata;
+run; 
+
+    proc sort data=pt&yr; 
+        by ENROLID;
+    run;
+data all_ser&yr; merge pt_id (in=a) pt&yr (in=b); by enrolid; if a and b; run;
+
+%mend;
+%c(2015,service,ccaes15);
+%c(2016,service,ccaes16);
+%c(2017,service,ccaes17);
+%c(2018,service,ccaes18);
+%c(2019,service,ccaes19);
+%c(2020,service,ccaes20);
+%c(2021,service,ccaes21);
+
+%macro c(yr, infile, indata);
+    data pt&yr;
+        set &infile..&indata;
+run; 
+
+    proc sort data=pt&yr; 
+        by ENROLID;
+    run;
+data all_ser_medi&yr; merge pt_id (in=a) pt&yr (in=b); by enrolid; if a and b; run;
+
+%mend;
+%c(2015,service,mdcrs15);
+%c(2016,service,mdcrs16);
+%c(2017,service,mdcrs17);
+%c(2018,service,mdcrs18);
+%c(2019,service,mdcrs19);
+%c(2020,service,mdcrs20);
+%c(2021,service,mdcrs21);
+
+/*OUTPATIENT 
+CCAE+MEDI*/
+
+%macro c(yr, infile, indata);
+    data pt&yr;
+        set &infile..&indata;
+run; 
+
+    proc sort data=pt&yr; 
+        by ENROLID;
+    run;
+data all_out&yr; merge pt_id (in=a) pt&yr (in=b); by enrolid; if a and b; run;
+
+%mend;
+%c(2015,outpat,ccaeo15);
+%c(2016,outpat,ccaeo16);
+%c(2017,outpat,ccaeo17);
+%c(2018,outpat,ccaeo18);
+%c(2019,outpat,ccaeo19);
+%c(2020,outpat,ccaeo20);
+%c(2021,outpat,ccaeo21);
+
+%macro c(yr, infile, indata);
+    data pt&yr;
+        set &infile..&indata;
+run; 
+
+    proc sort data=pt&yr; 
+        by ENROLID;
+    run;
+data all_out_medi&yr; merge pt_id (in=a) pt&yr (in=b); by enrolid; if a and b; run;
+
+%mend;
+%c(2015,outpat,mdcro15);
+%c(2016,outpat,mdcro16);
+%c(2017,outpat,mdcro17);
+%c(2018,outpat,mdcro18);
+%c(2019,outpat,mdcro19);
+%c(2020,outpat,mdcro20);
+%c(2021,outpat,mdcro21);
+
+/*BIG FILE : INPAT I FILE*/
+data young.all_i;
+set young.all_inpat2015-young.all_inpat2021;
+run;
+
+data young.all_medi_i;
+set young.all_inpat_medi2015-young.all_inpat_medi2021;
+run;
+
+data young.alli;
+set young.all_i young.all_medi_i;
+run;
+
+/*BIG FILE : SERVICE S FILE*/
+
+data young.all_S;
+set young.all_ser2015-young.all_ser2021;
+run;
+
+data young.all_medi_s;
+set young.all_ser_medi2015-young.all_ser_medi2021;
+run;
+
+data young.alls;
+set young.all_s young.all_medi_s;
+run;
+
+
+/*BIG FILE : OUTPAT O FILE*/
+
+data young.all_o;
+set young.all_out2015-young.all_out2021;
+run;
+
+data young.all_medi_o;
+set young.all_out_medi2015-young.all_out_medi2021;
+run;
+
+data young.allo;
+set young.all_o young.all_medi_o;
+run;
+
+/*ONE BIG COMORB FILE*/
+
+data young.comorb1;
+set young.alli young.alls young.allo;
+run;
+
+proc sort data=young.comorb1;
+by enrolid; run;
+
+
+/*WE WANT COMORB 6 MONTHS PRIOR*/
+data young.comorb;
+    set young.comorb1;
+    /* Calculate the difference in days between index (request) and discharge dates */
+    days_diff = STEMI_DSCHRG - disdate;  /* Ensure we calculate the time from discharge to index */
+
+    /* Keep only those records where the difference is up to 365 days (1/2 year before the index date) */
+    if days_diff >= 0 and days_diff <= 182; 
+
+    drop days_diff;
+run;
+
+/*ALL COMORBS*/
+
+/*SUBSTRING CHECK FOR COMORBIDITIES CHECK*/
+%macro como (comorb=, substr9=, substr10=);
+
+  DATA &comorb._1;
+    SET YOUNG.COMORB;
+    ARRAY DIA {15} DX1-DX15;
+    d = 0;
+
+    do i = 1 to 15;
+      if substr(DIA{i}, 1, 3) in (&substr9.) then d = 1;
+    end;
+
+    do i = 1 to 15;
+      if substr(DIA{i}, 1, 3) in (&substr10.) then d = 1;
+    end;
+
+  RUN;
+
+  DATA &comorb.;
+    SET &comorb._1;
+    IF D = . THEN d = 0;
+  RUN;
+
+  proc sql;
+    create table &comorb. as
+    select ENROLID,
+           max(d) as &comorb.
+    from &comorb.
+    group by ENROLID;
+  quit;
+
+  data YOUNG.FINAL;
+    merge &comorb. (IN=A) YOUNG.FINALSET (IN=B);
+    by ENROLID;
+    IF A AND B;
+  run;
+
+%mend;
+
+%como (comorb=DIAB, substr9="250", substr10="E10" "E11");
+
+%COMO (comorb=obesity, substr9="278", substr10="E66");
+
+%como (comorb=coagulopathy, substr9="286", substr10="D65" "D66" "D67" "D68");
+
+%como (comorb=abn_electrolyte, substr9="276", substr10="E87");
+
+%COMO (comorb=bp, substr9="401" "402" "403" "404" "405", substr10="I10" "I11" "I12" "I13" "I15");
+
+%COMO (comorb=Hypothyroidism, substr9="243" "244" "245", substr10="E02" "E03");
+
+%COMO (comorb=ckd, substr9="585", substr10="N18");
+
+%COMO (comorb=LIVER, substr9="570" "571" "572" "573", substr10= "K70" "K71" "K72" "K73" "K74" "K75" "K76" "K77");
+
+%COMO (comorb=lung, substr9="491" "492" "493", substr10="J41" "J42" "J43" "J44" "J45" "J47");
+
+%como (comorb=hf, substr9="428" "402" "404", substr10="I50" );
+
+
+/*EXACT CODES CHECK - MACRO FOR COMORBIDITIES*/
+%macro com (comorb=, codes=);
+  DATA &comorb._1;
+    SET YOUNG.COMORB;
+    ARRAY DIA {15} DX1-DX15;
+
+    do i = 1 to 15;
+      if DIA{i} in (&codes.) then d = 1;
+    end;
+  RUN;
+
+  DATA &comorb.;
+    SET &comorb._1;
+    IF D = . THEN d = 0;
+  RUN;
+
+  proc sql;
+    create table &comorb. as
+    select ENROLID,
+           max(d) as &comorb.
+    from &comorb.
+    group by ENROLID;
+  quit;
+
+  data YOUNG.FINAL;
+    merge &comorb. (IN=A) YOUNG.FINALSET (IN=B);
+    by ENROLID;
+    IF A AND B;
+  run;
+%mend;
+
+%com (comorb=PMI, codes="412" "I252");
+
+%com (comorb=Prior_pci, codes="4582" "Z9861");
+
+%com (comorb=prior_cabg, codes="4581"	"Z951");
+
+%com (comorb=prior_stroke, codes="438" "V1254" "Z8673");
+
+%com (comorb=depression, codes="2962" "29620" "29621" "29622" "29623" "29624" "29625" 
+"29626" "2963" "29630" "29631" "29632" "29633" "29634" "29635" "29636" "F330" "F331"
+"F332" "F333" "F3340" "F3341" "F3342" "F338" "F339" "F334" "F320" "F321" "F322"
+"F323" "F324" "F325" "F3289"  "F32A");
+
+%COM (COMORB=alcohol,codes="30500" "30501" "30502" "30503"
+"F1010" "F1011" "F10120" "F10121" "F10129" "F10130" "F10131" "F10132" "F10139" "F1014" "F10150" "F10151" "F10159" "F10180" "F10181" "F10182" "F10188" "F1019" "F1020" "F1021" "F10220" "F10221" "F10229" "F10230" "F10231" "F10232" "F10239" "F1024" "F10250" "F10251" "F10259" "F1026" "F1027" "F10280" "F10281" "F10282" "F10288" "F1029" "F1090" "F1091" "F10920" "F10921" "F10929" "F10930" "F10931" "F10932" "F10939" "F1094" "F10950" "F10951" "F10959" "F1096" "F1097" "F10980" "F10981" "F10982" "F10988" "F1099"
+);
+
+%com (COMORB=smoking, codes= "V1582" "3051" "F17200" "F17201" "F17203" "F17208" "F17209"
+"F17210" "F17211" "F17213" "F17218" "F17219" "F17220" "F17221" "F17223" "F17228" 
+"F17229" "F17290" "F17291" "F17293" "F17298" "F17299" "Z87891");
+
+%com (comorb=lipid, codes="2724" "2722" 	"E782" "E784" "E7841" "E7849" "E785");
+
+%com (comorb=a_flutter, codes= "42732" "I483" "I484" "I4892" );
+
+%com (comorb=a_fib, codes= "42731"	"I480" "I4811" "I4820" "I4821" "I4891");
+
+%com (comorb=anemia, codes="2800" "2801" "2808" "2809" "2810" "2811" "2812" "2813" "2814" "2818" "2819" "2820" "2821" "2822" "2823" "28240" "28241" "28242" "28243" "28244" "28245" "28246" "28247" "28249" "2825" "28260" "28261" "28262" "28263" "28264" "28268" "28269" "2827" "2828" "2829" "2830" "28310" "28311" "28319" "2832" "2839" "28401" "28409" "2841" "28411" "28412" "28419" "2842" "28481" "28489" "2849" "2850" "2851" "28521" "28522" "28529" "2853" "2858" "2859" "D50" "D500" "D501" "D508" "D509" "D51" "D510" "D511" "D512" "D513" "D518" "D519" "D52" "D520" "D521" "D528" "D529" "D53" "D530" "D531" "D532" "D538" "D539" "D55" "D550" "D551" "D552" "D553" "D558" "D559" "D56" "D560" "D561" "D562" "D563" "D564" "D568" "D569" "D57" "D570" "D571" "D572" "D573" "D578" "D58" "D580" "D581" "D582" "D588" "D589" "D59" "D590" "D591" "D592" "D593" "D594" "D595" "D596" "D598" "D599" "D60" "D600" "D601" "D608" "D609" "D61" "D610" "D611" "D612" "D613" "D618" "D619" "D62" "D63" "D630" "D638" "D64" "D640" "D641" "D642" "D643" "D644" "D648" "D649"
+);
+
+%com(comorb=av_block, codes="42611" "I440");
+
+%COM (comorb=pvd, codes="4439" "I739");
+
+%com(comorb=prior_icd, codes="V4502" "Z9581");
+
+%COM (comorb=cad, codes="43310" "I6501" "I6502" "I6503" "I6509");
+
+%COM (COMORB=RHEUMATIC, codes= "3940" "3941" "3942" "3949" "3950" "3951" "3952" "3959" "3970" "3971" "3979" "3960" "3961" "3962" "396" "3968" "3969"
+"I050" "I051" "I052" "I058" "I059" "I060" "I061" "I062" "I068" "I069" "I070" "I071" "I072" "I078" "I079" "I0989" "I091" "I080" "I081" "I082" "I083" "I088" "I089"
+);
+
+%com (comorb=nonrheumatic, codes="4240" "4240" "4241" "4242" "4243" "I340" "I341" "I342" "I348" "I3481" "I3489" "I349" "I350" "I351" "I352" "I358" "I359" "I360" "I361" "I362" "I368" "I369" "I370" "I371" "I372" "I378" "I379" "I390" "I391" "I392" "I393" "I394"
+);
+
+%com (comorb=phd, codes="4150" "41511" "41512" "41513" "41519" "4160" "4161" "4168" "4169" "4162" "4168" "4170" "4171" "4178" "4179" 
+"I2601" "I2602" "I2609" "I2690" "I2692" "I2693" "I2694" "I2699" "I270" "I271" "I272" "I2720" "I2721" "I2722" "I2723" "I2724" "I2729"
+"I2781" "I2782" "I2783" "I2789" "I279" "I280" "I281" "I288" "I289"
+);
+
+/*prior pacemaker
+CHECK DX1-15 & PROC1-PROC15*/
+
+%macro therapy (comorb=, codes=);
+  DATA &comorb._1;
+    SET YOUNG.COMORB;
+    
+    /* Check DX1-DX15*/ 
+    ARRAY DIA {15} DX1-DX15;
+    /* Check PROC1-PROC15 */
+    ARRAY PROC {15} PROC1-PROC15;
+    
+    d = 0;
+
+    do i = 1 to 15;
+      if DIA{i} in (&codes.) or PROC{i} in (&codes.) then d = 1;
+    end;
+
+  RUN;
+
+  DATA &comorb.;
+    SET &comorb._1;
+    IF D = . THEN d = 0;
+  RUN;
+
+  proc sql;
+    create table &comorb. as
+    select ENROLID,
+           max(d) as &comorb.
+    from &comorb.
+    group by ENROLID;
+  quit;
+
+  data YOUNG.FINAL;
+    merge &comorb. (IN=A) YOUNG.FINALSET (IN=B);
+    by ENROLID;
+    IF A AND B;
+  run;
+%mend;
+
+%therapy (comorb=prior_pacemaker, codes= "V4501" "V5331" "Z950" "Z450" "Z4501" "Z45010"
+"3770" "3771" "3776" "3773" "3774" "0053" "3783" "3782" "3781" "3774" "3770" "02HK3JZ" "02H63JZ" "02HN0JZ" "02H60JZ" "02H60NZ" "02H63JZ" "02H63NZ" "02H64JZ" "02H64NZ" "02HK0JZ" "02HK0NZ" "02HK3JZ" "02HK3NZ" "02HK4JZ" "02HK4NZ" "02HN4JZ" "0JH604Z" "0JH634Z" "0JH605Z" "0JH607Z" "0JH635Z" "0JH606Z" "0JH634Z" "0JH635Z" "0JH636Z" "0JH637Z"
+);
+
+data /*comorb*/;
+set young.final;
+run;
+
+
+
+/*1 BIG FILE*/
+DATA young.finaldata;
+merge Diab obesity coagulopathy abn_electrolyte bp hypothyroidism ckd 
+liver lung hf pmi prior_pci prior_cabg prior_stroke depression alcohol
+smoking lipid a_flutter a_fib anemia av_block pvd prior_icd cad rheumatic
+nonrheumatic phd prior_pacemakeR;
+by enrolid; run;
+
+proc freq data=young.finaldata;
+tables age_cat*sex/chisq;
+run;
+proc sort data=young.finaldata; by final_age; run;
+proc print data=baseline(obs=1); run;
+
+
+DATA YOUNG.finaldata;
+SET young.finaldata;
+    if index_age <= 50 then final_age = 1;
+    else if 50 < index_age <= 60 then final_age = 2;
+    else if 60 < index_age <= 70 then final_age = 3;
+    else if 70 < index_age <= 80 then final_age = 4;
+    else if index_age > 80 then final_age = 5;
+run;
+
+data baseline (keep=ENROLID av_block SEX  
+index_age  depression DIAB obesity coagulopathy abn_electrolyte bp Hypothyroidism ckd LIVER lung hf PMI Prior_pci prior_cabg 
+prior_stroke alcohol smoking lipid a_flutter a_fib anemia pvd prior_icd cad RHEUMATIC nonrheumatic phd prior_pacemaker final_age );
+set young.finaldata;
+run;
+
+
+
+proc freq data=baseline;
+by final_age;
+tables prior_pacemaker*sex/chisq fisher;
+run;
+
+
+/*PCI CABG SYSTEMIC FIBRINOLYTICS 
+
+IN STEMI CLAIM*/
+
+/*ONLY PCI*/
+
+data outcome_pci;
+set young.FINALDATA;
+outcome_PCI=0;
+array out {15} PROC1-PROC15;
+DO i= 1 to 15;
+if out {i} in ("0066" "3601" "3602" "3605" "3606" "3607" "1755" "3609" "02703E6" "02723E6" "02703EZ" "02723EZ" "02703F6" "02723F6" "02703FZ" "02723FZ" "02703G6"
+"02723G6" "02703GZ" "02723GZ" "02703Z6" "02723Z6" "02703ZZ" "02723ZZ" "0270446" "0272446" "027044Z" "027244Z" "0270456" "0272456" "027045Z" "027245Z" "0270466" "0272466"
+"027046Z" "027246Z" "0270476" "0272476" "027047Z" "027247Z" "02704D6" "02724D6" "02704DZ" "02724DZ" "02704E6" "02724E6" "02704EZ" "02724EZ" "02704F6" "02724F6" "02704FZ" 
+"02724FZ" "02704G6" "02724G6" "02704GZ" "02724GZ" "02704Z6" "02724Z6" "02704ZZ" "02724ZZ" "0271346" "0273346" "027134Z" "027334Z" "0271356" "0273356" "027135Z" "027335Z" 
+"0271366" "0273366" "027136Z" "027336Z" "0271376" "0273376" "027137Z" "027337Z" "02713D6" "02733D6" "02713DZ" "02733DZ" "02713E6" "02733E6" "02713EZ" "02733EZ" "02713F6" 
+"02733F6" "02713FZ" "02733FZ" "02713G6" "02733G6" "02713GZ" "02733GZ" "02713Z6" "02733Z6" "02713ZZ" "02733ZZ" "0271446" "0273446" "027144Z" "027344Z" "0271456" "0273456"
+"027145Z" "027345Z" "0271466" "0273466" "027146Z" "027346Z" "0271476" "0273476" "027147Z" "027347Z" "02714D6" "02734D6" "02714DZ" "02734DZ" "02714E6" "02734E6" "02714EZ" 
+"02734EZ" "02714F6" "02734F6" "02714FZ" "02734FZ" "02714G6" "02734G6" "02714GZ" "02734GZ" "02714Z6" "02734Z6" "02714ZZ" "02734ZZ" "0270346" "0272346" "027034Z" "027234Z" 
+"0270356" "0272356" "027035Z" "027235Z" "0270366" "0272366" "027036Z" "027236Z" "0270376" "0272376" "027037Z" "027237Z" "02703D6" "02723D6" "02703DZ" "02723DZ"
+
+) then outcome_pci=1;
+end;
+run;
+proc freq data=outcome_pci;
+tables outcome_pci*sex/chisq;
+run;
+
+/*33743 pci cases
+
+outcome_PCI Frequency Percent Cumulative
+Frequency Cumulative
+Percent 
+0 9630 22.20 
+1 33743 77.80  
+
+
+*/
+
+/*ONLY CABG*/
+data outcome_cabg;
+set young.finalDATA;
+outcome_cabg=0;
+    ARRAY out {15} PROC1-PROC15;
+   
+    do i = 1 to 15;
+ if out {i} IN ("361" "3610" "3611" "3612" "3613" "3614" "3615" "3616" "3617" "3619" "3620"
+"0210" "02100" "021008" "0210083" "0210088" "0210089" "021008C" "021008F" "021008W" "021009" "0210093" "0210098" "0210099" "021009C" "021009F" "021009W" "02100A" "02100A3" "02100A8" "02100A9" "02100AC" "02100AF" "02100AW" "02100J" "02100J3" "02100J8" "02100J9" "02100JC" "02100JF" "02100JW" "02100K" "02100K3" "02100K8" "02100K9" "02100KC" "02100KF" "02100KW" "02100Z" "02100Z3" "02100Z8" "02100Z9" "02100ZC" "02100ZF" "02103" "021034" "0210344" "02103D" "02103D4" "02104" "021044" "0210444" "021048" "0210483" "0210488" "0210489" "021048C" "021048F" "021048W" "021049" "0210493" "0210498" "0210499" "021049C" "021049F" "021049W" "02104A" "02104A3" "02104A8" "02104A9" "02104AC" "02104AF" "02104AW" "02104D" "02104D4" "02104J" "02104J3" "02104J8" "02104J9" "02104JC" "02104JF" "02104JW" "02104K" "02104K3" "02104K8" "02104K9" "02104KC" "02104KF" "02104KW" "02104Z" "02104Z3" "02104Z8" "02104Z9" "02104ZC" "02104ZF" "0211" "02110" "021108" "0211083" "0211088" "0211089" "021108C" "021108F" "021108W" "021109" "0211093" "0211098" "0211099" "021109C" "021109F" "021109W" "02110A" "02110A3" "02110A8" "02110A9" "02110AC" "02110AF" "02110AW" "02110J" "02110J3" "02110J8" "02110J9" "02110JC" "02110JF" "02110JW" "02110K" "02110K3" "02110K8" "02110K9" "02110KC" "02110KF" "02110KW" "02110Z" "02110Z3" "02110Z8" "02110Z9" "02110ZC" "02110ZF" "02113" "021134" "0211344" "02113D" "02113D4" "02114" "021144" "0211444" "021148" "0211483" "0211488" "0211489" "021148C" "021148F" "021148W" "021149" "0211493" "0211498" "0211499" "021149C" "021149F" "021149W" "02114A" "02114A3" "02114A8" "02114A9" "02114AC" "02114AF" "02114AW" "02114D" "02114D4" "02114J" "02114J3" "02114J8" "02114J9" "02114JC" "02114JF" "02114JW" "02114K" "02114K3" "02114K8" "02114K9" "02114KC" "02114KF" "02114KW" "02114Z" "02114Z3" "02114Z8" "02114Z9" "02114ZC" "02114ZF" "0212" "02120" "021208" "0212083" "0212088" "0212089" "021208C" "021208F" "021208W" "021209" "0212093" "0212098" "0212099" "021209C" "021209F" "021209W" "02120A" "02120A3" "02120A8" "02120A9" "02120AC" "02120AF" "02120AW" "02120J" "02120J3" "02120J8" "02120J9" "02120JC" "02120JF" "02120JW" "02120K" "02120K3" "02120K8" "02120K9" "02120KC" "02120KF" "02120KW" "02120Z" "02120Z3" "02120Z8" "02120Z9" "02120ZC" "02120ZF" "02123" "021234" "0212344" "02123D" "02123D4" "02124" "021244" "0212444" "021248" "0212483" "0212488" "0212489" "021248C" "021248F" "021248W" "021249" "0212493" "0212498" "0212499" "021249C" "021249F" "021249W" "02124A" "02124A3" "02124A8" "02124A9" "02124AC" "02124AF" "02124AW" "02124D" "02124D4" "02124J" "02124J3" "02124J8" "02124J9" "02124JC" "02124JF" "02124JW" "02124K" "02124K3" "02124K8" "02124K9" "02124KC" "02124KF" "02124KW" "02124Z" "02124Z3" "02124Z8" "02124Z9" "02124ZC" "02124ZF" "0213" "02130" "021308" "0213083" "0213088" "0213089" "021308C" "021308F" "021308W" "021309" "0213093" "0213098" "0213099" "021309C" "021309F" "021309W" "02130A" "02130A3" "02130A8" "02130A9" "02130AC" "02130AF" "02130AW" "02130J" "02130J3" "02130J8" "02130J9" "02130JC" "02130JF" "02130JW" "02130K" "02130K3" "02130K8" "02130K9" "02130KC" "02130KF" "02130KW" "02130Z" "02130Z3" "02130Z8" "02130Z9" "02130ZC" "02130ZF" "02133" "021334" "0213344" "02133D" "02133D4" "02134" "021344" "0213444" "021348" "0213483" "0213488" "0213489" "021348C" "021348F" "021348W" "021349" "0213493" "0213498" "0213499" "021349C" "021349F" "021349W" "02134A" "02134A3" "02134A8" "02134A9" "02134AC" "02134AF" "02134AW" "02134D" "02134D4" "02134J" "02134J3" "02134J8" "02134J9" "02134JC" "02134JF" "02134JW" "02134K" "02134K3" "02134K8" "02134K9" "02134KC" "02134KF" "02134KW" "02134Z" "02134Z3" "02134Z8" "02134Z9" "02134ZC" "02134ZF"
+)
+then outcome_cabg=1;
+end;
+run;
+proc freq data=outcome_cabg;
+tables outcome_cabg*SEX/CHISQ;
+run;
+
+/*1845 cabg cases
+outcome_cabg Frequency Percent Cumulative
+Frequency Cumulative
+Percent 
+0 41528 95.75  
+1 1845 4.25 
+*/
+
+/*SYSTEMIC FIBRINOLYTIC*/
+data outcome_fibrinolytic;
+set young.finalDATA;
+outcome_sft=0;
+
+    /* Check DX1-DX15 */
+    ARRAY DIA {15} DX1-DX15;
+    /* Check PROC1-PROC15 */
+    ARRAY PROC {15} PROC1-PROC15;
+   
+    do i = 1 to 15;
+      if DIA{i} in ("V4588", "9910" ,"Z9282", "3E04317" ,"3E03317") or PROC{i} in (
+"V4588", "9910" ,"Z9282", "3E04317", "3E03317") then outcome_sft = 1;
+    end;
+
+  RUN;
+
+
+proc freq data=outcome_fibrinolytic;
+tables outcome_sft*Sex/CHISQ;
+run;
+/*468 1.08%*/
+
+/*IABP*/
+data outcome_IABP;
+set young.finalDATA;
+outcome_IABP=0;
+    /* Check PROC1-PROC15 */
+    ARRAY PROC {15} PROC1-PROC15;
+   
+    do i = 1 to 15;
+      if proc{i} in ("3761" "5A02210") then outcome_IABP = 1;
+    end;
+
+  RUN;
+
+
+proc freq data=outcome_iabp;
+tables outcome_iabp*Sex/chisq;
+run;
+
+/*2295 IABP 5.29%*/
+
+/*ECMO*/
+data outcome_ECMO;
+set young.finalDATA;
+outcome_ECMO=0;
+    /* Check PROC1-PROC15 */
+    ARRAY PROC {15} PROC1-PROC15;
+   
+    do i = 1 to 15;
+      if  proc{i} in ("3966" , "5A1522G" ) then outcome_ECMO = 1;
+    end;
+
+  RUN;
+
+
+proc freq data=outcome_ECMO;
+tables outcome_ECMO*Sex/CHISQ;
+run;
+/*76 0.18%*/
+
+/*IMPELLA*/
+
+data outcome_IMPELLA;
+set young.finalDATA;
+outcome_IMPELLA=0;
+    /* Check PROC1-PROC15 */
+    ARRAY PROC {15} PROC1-PROC15;
+   
+    do i = 1 to 15;
+      if  proc{i} in ("3768", "5A0221D", "5A0211D" 
+
+) then outcome_IMPELLA = 1;
+    end;
+
+  RUN;
+
+
+proc freq data=outcome_IMPELLA;
+tables outcome_IMPELLA*Sex/CHISQ;
+run;
+/*740 1.71%*/
+
+DATA YOUNG.outcomes;
+MERGE OUTCOME_PCI OUTCOME_CABG outcome_fibrinolytic outcome_iabp outcome_ecmo outcome_impella;
+by enrolid; run;
+
+
+data young.allfile;
+merge young.outcomes young.finaldata;
+by enrolid;
+run;
+
+/*PCI + CABG*/
+data young.allfile;
+set young.allfile;
+outcome_pci_cabg=0;
+if outcome_pci=1 and outcome_cabg=1 then outcome_pci_cabg=1;
+run;
+proc freq dta=young.allfile;
+tables outcome_pci_cabg*sex/chisq; run;
+
+
+/*ECMO+IMPELLA*/
+data young.allfile;
+set young.allfile;
+outcome_ECMO_IMPELLA=0;
+if outcome_ECMO=1 and outcome_IMPELLA=1 then outcome_ECMO_IMPELLA=1;
+run;
+proc freq dta=young.allfile;
+tables outcome_ECMO_IMPELLA*sex/chisq; run;
+
+
+/*PCI OR CABG*/
+data young.allfile;
+set young.allfile;
+outcome_pci_OR_cabg=0;
+if outcome_pci=1 OR outcome_cabg=1 then outcome_pci_OR_cabg=1;
+run;
+proc freq dta=young.allfile;
+tables outcome_pci_OR_cabg*sex/chisq; run;
+proc freq dta=young.allfile;
+tables outcome_pci_cabg*sex/chisq; run;
+/*(outcome_pci_cabg Frequency Percent 
+Percent 
+1 505 1.16 
+*/
+
+proc freq dta=young.allfile;
+tables outcome_ecmo_impella*SEX/CHISQ fisher; run;
+
+/*outcome_ecmo_impella Frequency Percent 
+Percent 
+ 24 0.06 
+*/
+
+proc freq data=young.allfile;
+tables outcome_pci_or_cabg*sex/chisq;
+run;
+
+/*outcome_pci_or_cabg Frequency Percent 
+Percent 
+
+ 35083 80.89 
+*/
+/*SOME DEMOGRAPHGICS*/
+proc freq data=young.allfile;
+tables region*sex/chisq;
+run;
+
+
+/*LOGISTIC REGRESSION FOR TREATMNETS
+unadjusted */
+proc print data=young.allfile (obs=10); run;
+
+Proc logistic data=young.allfile;
+class sex (ref='1');
+model outcome_ecmo_impella (event='1')=sex;
+run;
+
+/*LOGISTIC REGRESSION ADJUSTED*/
+Proc logistic data=young.allfile;
+class sex (ref='1') DIAB (REF='0') obesity (REF='0') coagulopathy (REF='0') abn_electrolyte (REF='0') bp (REF='0') Hypothyroidism (REF='0') ckd (REF='0') LIVER (REF='0') lung (REF='0')
+hf (REF='0') PMI (REF='0') Prior_pci (REF='0') prior_cabg (REF='0') prior_stroke (REF='0') alcohol (REF='0') smoking (REF='0') lipid (REF='0') a_flutter (REF='0') a_fib (REF='0') 
+anemia (REF='0') av_block (REF='0') pvd (REF='0') prior_icd (REF='0') cad (REF='0') RHEUMATIC (REF='0') nonrheumatic (REF='0') phd (REF='0') prior_pacemaker (REF='0') depression (REF='0');
+
+model outcome_ECMO_IMPELLA (event='1')=sex INDEX_AGE DIAB obesity coagulopathy abn_electrolyte bp Hypothyroidism ckd LIVER lung hf PMI Prior_pci prior_cabg prior_stroke alcohol smoking lipid a_flutter a_fib anemia av_block pvd prior_icd cad RHEUMATIC nonrheumatic phd prior_pacemaker ;
+run;
+
+
+proc print data=young.allfile (obs=1); run;
+
+/*LOGISTIC REGRESSION AGE stratified */
+PROC SORT DATA=YOUNG.ALLFILE;
+BY index_agecat;
+RUN;
+
+Proc logistic data=young.allfile;
+class sex (ref='1') DIAB (REF='0') obesity (REF='0') coagulopathy (REF='0') abn_electrolyte (REF='0') bp (REF='0') Hypothyroidism (REF='0') ckd (REF='0') LIVER (REF='0') lung (REF='0')
+hf (REF='0') PMI (REF='0') Prior_pci (REF='0') prior_cabg (REF='0') prior_stroke (REF='0') alcohol (REF='0') smoking (REF='0') lipid (REF='0') a_flutter (REF='0') a_fib (REF='0') 
+anemia (REF='0') av_block (REF='0') pvd (REF='0') prior_icd (REF='0') cad (REF='0') RHEUMATIC (REF='0') nonrheumatic (REF='0') phd (REF='0') prior_pacemaker (REF='0') depression (REF='0');
+BY index_agecat;
+model outcome_impella (event='1')=sex  DIAB obesity coagulopathy abn_electrolyte bp Hypothyroidism ckd LIVER lung hf PMI Prior_pci prior_cabg prior_stroke alcohol smoking lipid a_flutter a_fib anemia av_block pvd prior_icd cad RHEUMATIC nonrheumatic phd prior_pacemaker ;
+run;
